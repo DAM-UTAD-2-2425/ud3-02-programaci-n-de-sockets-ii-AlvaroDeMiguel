@@ -1,32 +1,67 @@
 package cliente;
 
-/**
- * TODO: Complementa esta clase para que genere la conexi髇 TCP con el servidor
- * para enviar un boleto, recibir la respuesta y finalizar la sesion
- */
+
+import java.io.*;
+import java.net.*;
+
 public class ClienteTCP {
 
-	/**
-	 * Constructor
-	 */
-	public ClienteTCP(String ip, int puerto) {
+    private Socket socketcliente;
+    private BufferedReader entrada = null;
+    private PrintWriter salida = null;
 
-	}
+    /**
+     * Constructor
+     * Establece la conexi贸n con el servidor en la IP y puerto especificados.
+     */
+    public ClienteTCP(String ip, int puerto) {
+        try {
+        	socketcliente = new Socket(ip, puerto);
+        	 entrada = new BufferedReader(new InputStreamReader(socketcliente.getInputStream()));
+             salida = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socketcliente.getOutputStream())), true);
+            System.out.println("Conexi贸n establecida con el servidor en " + ip + ":" + puerto);
+        } catch (IOException e) {
+            System.err.println("Error al conectar con el servidor: " + e.getMessage());
+        }
+    }
 
-	/**
-	 * @param combinacion que se desea enviar
-	 * @return respuesta del servidor con la respuesta del boleto
-	 */
-	public String comprobarBoleto(int[] combinacion) {
-		String respuesta = "Sin hacer";
-		return respuesta;
-	}
+    /**
+     * Env铆a la combinaci贸n de n煤meros al servidor y recibe la respuesta.
+     * @param combinacion La combinaci贸n de n煤meros a enviar al servidor.
+     * @return Respuesta recibida del servidor con el resultado del boleto.
+     */
+    public String comprobarBoleto(int[] combinacion) {
+        try {
+            // Convierto la combinaci贸n de n煤meros en un string separado por espacios
+            StringBuilder combinacionStr = new StringBuilder();
+            for (int num : combinacion) {
+                combinacionStr.append(num).append(" ");
+//                System.out.println(combinacionStr);
+            }
 
-	/**
-	 * Sirve para finalizar la la conexi髇 de Cliente y Servidor
-	 */
-	public void finSesion () {
-		
-	}
-	
+            // Envio la combinaci贸n al servidor
+            salida.println(combinacionStr.toString().trim()); // trim elimina el espacio extra al final
+
+            // Leo la respuesta del servidor
+            return entrada.readLine();
+        } catch (IOException e) {
+            System.err.println("Error al enviar la combinaci贸n o recibir la respuesta: " + e.getMessage());
+            return "Error de comunicaci贸n con el servidor";
+        }
+    }
+
+    /**
+     * Finalizo la conexi贸n con el servidor.
+     */
+    public void finSesion() {
+    	try {
+            salida.close();
+            entrada.close();
+            socketcliente.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("-> Cliente Terminado");
+    }
 }
+

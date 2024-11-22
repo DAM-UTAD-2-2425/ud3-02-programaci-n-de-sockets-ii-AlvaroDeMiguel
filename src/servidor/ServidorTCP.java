@@ -1,26 +1,28 @@
 package servidor;
 
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
+import java.io.*;
+import java.net.*;
+import java.util.*;
 
-/**
- * TODO: Complementa esta clase para que acepte conexiones TCP con clientes
- * para recibir un boleto, generar la respuesta y finalizar la sesion
- */
 public class ServidorTCP {
-	private String [] respuesta;
-	private int [] combinacion;
+
+	private String[] respuesta;
+	private int[] combinacion;
 	private int reintegro;
 	private int complementario;
+
+	private ServerSocket socketservidor;
+	private Socket socketcliente;
+	private BufferedReader entrada;
+	private PrintWriter salida;
 
 	/**
 	 * Constructor
 	 */
-	public ServidorTCP (int puerto) {
-		this.respuesta = new String [9];
-		this.respuesta[0] = "Boleto inv醠ido - N鷐eros repetidos";
-		this.respuesta[1] = "Boleto inv醠ido - n鷐eros incorretos (1-49)";
+	public ServidorTCP(int puerto) {
+		this.respuesta = new String[9];
+		this.respuesta[0] = "Boleto inv谩lido - N煤meros repetidos";
+		this.respuesta[1] = "Boleto inv谩lido - n煤meros incorrectos (1-49)";
 		this.respuesta[2] = "6 aciertos";
 		this.respuesta[3] = "5 aciertos + complementario";
 		this.respuesta[4] = "5 aciertos";
@@ -30,68 +32,131 @@ public class ServidorTCP {
 		this.respuesta[8] = "Sin premio";
 		generarCombinacion();
 		imprimirCombinacion();
-	}
-	
-	
-	/**
-	 * @return Debe leer la combinacion de numeros que le envia el cliente
-	 */
-	public String leerCombinacion () {
-		String respuesta = "Sin hacer leer";
-		return respuesta;
-	}
-	
-	/**
-	 * @return Debe devolver una de las posibles respuestas configuradas
-	 */
-	public String comprobarBoleto () {
-		String respuesta = "Sin hacer comprobar";
-		return respuesta;
+
+		try {
+			socketservidor = new ServerSocket(puerto);
+			System.out.println("Servidor escuchando en el puerto " + puerto);
+			socketcliente = socketservidor.accept();
+			System.out.println("Cliente conectado.");
+			entrada = new BufferedReader(new InputStreamReader(socketcliente.getInputStream()));
+			salida = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socketcliente.getOutputStream())), true);
+		} catch (IOException e) {
+			System.err.println("Error al iniciar el servidor: " + e.getMessage());
+		}
 	}
 
 	/**
-	 * @param respuesta se debe enviar al ciente
+	 * Lee la combinaci贸n de n煤meros enviada por el cliente.
+	 * 
+	 * @return La combinaci贸n como cadena de texto.
 	 */
-	public void enviarRespuesta (String respuesta) {
-		
+	public String leerCombinacion() {
+		try {
+			System.out.println("Combinacion cliente: " + entrada.readLine());
+			return entrada.readLine();
+		} catch (IOException e) {
+			System.err.println("Error al leer la combinaci贸n: " + e.getMessage());
+			return "Error";
+		}
 	}
-	
+
 	/**
-	 * Cierra el servidor
+	 * Comprueba el boleto recibido contra la combinaci贸n ganadora.
+	 * 
+	 * @return Respuesta correspondiente al resultado del boleto.
 	 */
-	public void finSesion () {
-		
+	public String comprobarBoleto() {
+		try {
+			String combinacionCliente = leerCombinacion();
+			String[] numeros = combinacionCliente.split(" ");
+			
+			int[] boleto = new int[6];
+			for (int i = 0; i < 6; i++) {
+				int num = Integer.parseInt(numeros[i]);
+				if (num < 1 || num > 49)
+					return respuesta[1];
+			}
+
+			int aciertos = 0;
+			boolean tieneComplementario = false;
+			for (int num : boleto) {
+				if (Arrays.stream(combinacion).anyMatch(x -> x == num))
+					aciertos++;
+				if (num == complementario)
+					tieneComplementario = true;
+			}
+
+			if (aciertos == 6)
+				return respuesta[2];
+			if (aciertos == 5 && tieneComplementario)
+				return respuesta[3];
+			if (aciertos == 5)
+				return respuesta[4];
+			if (aciertos == 4)
+				return respuesta[5];
+			if (aciertos == 3)
+				return respuesta[6];
+			if (Arrays.stream(boleto).anyMatch(x -> x == reintegro))
+				return respuesta[7];
+			return respuesta[8];
+
+		} catch (Exception e) {
+			System.err.println("Error al comprobar boleto: " + e.getMessage());
+			return "Error en la validaci贸n del boleto";
+		}
 	}
-	
+
 	/**
-	 * Metodo que genera una combinacion. NO MODIFICAR
+	 * Env铆a la respuesta generada al cliente.
+	 * 
+	 * @param respuesta La respuesta que se enviar谩 al cliente.
 	 */
-	private void generarCombinacion () {
-		Set <Integer> numeros = new TreeSet <Integer>();
-		Random aleatorio = new Random ();
-		while (numeros.size()<6) {
-			numeros.add(aleatorio.nextInt(49)+1);
+	public void enviarRespuesta(String respuesta) {
+		salida.println(respuesta);
+	}
+
+	/**
+	 * Cierra la conexi贸n con el cliente y el servidor.
+	 */
+	public void finSesion() {
+		try {
+			salida.close();
+			entrada.close();
+			socketcliente.close();
+			socketservidor.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		System.out.println("-> Servidor Terminado");
+	}
+
+	/**
+	 * M茅todo que genera una combinaci贸n ganadora aleatoria. NO MODIFICAR
+	 */
+	private void generarCombinacion() {
+		Set<Integer> numeros = new TreeSet<>();
+		Random aleatorio = new Random();
+		while (numeros.size() < 6) {
+			numeros.add(aleatorio.nextInt(49) + 1);
 		}
 		int i = 0;
-		this.combinacion = new int [6];
+		this.combinacion = new int[6];
 		for (Integer elto : numeros) {
-			this.combinacion[i++]=elto;
+			this.combinacion[i++] = elto;
 		}
 		this.reintegro = aleatorio.nextInt(49) + 1;
 		this.complementario = aleatorio.nextInt(49) + 1;
 	}
-	
+
 	/**
-	 * Metodo que saca por consola del servidor la combinacion
+	 * M茅todo que imprime la combinaci贸n ganadora en la consola del servidor.
 	 */
-	private void imprimirCombinacion () {
-		System.out.print("Combinaci髇 ganadora: ");
-		for (Integer elto : this.combinacion) 
+	private void imprimirCombinacion() {
+		System.out.print("Combinaci贸n ganadora: ");
+		for (Integer elto : this.combinacion)
 			System.out.print(elto + " ");
 		System.out.println("");
 		System.out.println("Complementario:       " + this.complementario);
 		System.out.println("Reintegro:            " + this.reintegro);
 	}
-
 }
-
